@@ -34,6 +34,8 @@ services:
 
   api:
     build: .
+    image: bookcourt-api
+    init: true # PID 1 signal handling / zombie reaping
     restart: unless-stopped
     env_file:
       - path: .env
