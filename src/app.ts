@@ -20,6 +20,7 @@ import { healthRoutes } from './modules/health/health.routes.js';
 import { courtsRoutes } from './modules/courts/courts.routes.js';
 import { availabilityRoutes } from './modules/availability/availability.routes.js';
 import { bookingsRoutes } from './modules/bookings/bookings.routes.js';
+import { tenantsRoutes } from './modules/tenants/tenants.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { courtsAdminRoutes } from './modules/courts/courts.admin.routes.js';
 import { bookingsAdminRoutes } from './modules/bookings/bookings.admin.routes.js';
@@ -72,6 +73,7 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
       await api.register(rateLimitPlugin);
       await api.register(tenantPlugin);
       await api.register(authPlugin);
+      await api.register(tenantsRoutes);
       await api.register(courtsRoutes);
       await api.register(availabilityRoutes);
       await api.register(bookingsRoutes);
