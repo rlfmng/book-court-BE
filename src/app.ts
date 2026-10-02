@@ -13,7 +13,13 @@ import { env } from './config/env.js';
 import dbPlugin from './plugins/db.js';
 import redisPlugin from './plugins/redis.js';
 import errorsPlugin from './plugins/errors.js';
+import tenantPlugin from './plugins/tenant.js';
+import authPlugin from './plugins/auth.js';
+import rateLimitPlugin from './plugins/rate-limit.js';
 import { healthRoutes } from './modules/health/health.routes.js';
+import { courtsRoutes } from './modules/courts/courts.routes.js';
+import { availabilityRoutes } from './modules/availability/availability.routes.js';
+import { bookingsRoutes } from './modules/bookings/bookings.routes.js';
 
 export async function buildApp(opts: FastifyServerOptions = {}) {
   const app = Fastify({
@@ -56,6 +62,19 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
   await app.register(redisPlugin);
 
   await app.register(healthRoutes);
+
+  // Everything tenant-scoped lives under /api/v1 and requires x-tenant-slug.
+  await app.register(
+    async (api) => {
+      await api.register(rateLimitPlugin);
+      await api.register(tenantPlugin);
+      await api.register(authPlugin);
+      await api.register(courtsRoutes);
+      await api.register(availabilityRoutes);
+      await api.register(bookingsRoutes);
+    },
+    { prefix: '/api/v1' },
+  );
 
   return app;
 }
