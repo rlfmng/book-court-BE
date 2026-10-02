@@ -38,7 +38,7 @@ export default fp(
       } else if (err.statusCode && err.statusCode < 500) {
         return reply
           .status(err.statusCode)
-          .send({ error: { code: err.code ?? 'BAD_REQUEST', message: err.message } });
+          .send({ error: { code: !err.code || err.code.startsWith('FST_') ? 'BAD_REQUEST' : err.code, message: err.message } });
       } else {
         request.log.error({ err }, 'unhandled error');
       }

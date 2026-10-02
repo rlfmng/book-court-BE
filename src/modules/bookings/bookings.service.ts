@@ -84,7 +84,9 @@ export function createBookingsService(app: FastifyInstance) {
       }
       const startsAt = localDateTime(input.date, start, tenant.timezone);
       const endsAt = localDateTime(input.date, end, tenant.timezone);
-      if (startsAt <= new Date()) throw badRequest('INVALID_SLOT', 'That time slot has already started');
+      // Online bookings must start in the future; staff may still book a walk-in for the hour in progress.
+      const cutoff = input.source === 'walk_in' ? endsAt : startsAt;
+      if (cutoff <= new Date()) throw badRequest('INVALID_SLOT', 'That time slot has already started');
 
       // Price is always computed server-side.
       const totalPrice = Math.round(Number(court.price_per_hour) * input.hours * 100) / 100;

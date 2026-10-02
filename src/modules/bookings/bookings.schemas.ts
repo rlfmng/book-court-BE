@@ -71,7 +71,7 @@ export const CancelBody = z
     reference: z.string().trim().min(4).max(32).optional(),
     phone: Phone.optional(),
   })
-  .optional()
+  .nullish()
   .describe('Required for customers (reference + phone). Staff can cancel with a bearer token and no body.');
 
 export const AdminBookingsQuery = z.object({

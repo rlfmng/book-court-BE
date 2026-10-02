@@ -62,3 +62,10 @@ export default fp(
   },
   { name: 'auth', dependencies: ['tenant'] },
 );
+
+/** preHandler factory: restrict a route to specific staff roles (use after `authenticate`). */
+export function requireRole(...roles: StaffRole[]) {
+  return async (request: FastifyRequest) => {
+    if (!roles.includes(request.user.role)) throw forbidden(`Requires role: ${roles.join(' or ')}`);
+  };
+}
