@@ -1,0 +1,87 @@
+name: bookcourt
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bookcourt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bookcourt}
+      POSTGRES_DB: ${POSTGRES_DB:-bookcourt}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    image: bookcourt-api
+    init: true # PID 1 signal handling / zombie reaping
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-bookcourt}:${POSTGRES_PASSWORD:-bookcourt}@postgres:5432/${POSTGRES_DB:-bookcourt}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-jwt-secret-change-me-please}
+      RUN_MIGRATIONS: "true"
+      # Browser origin of the web service below.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${WEB_PORT:-3000}}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 5
+
+  web:
+    build:
+      context: ../book-court-FE
+      args:
+        # Inlined into the browser bundle. The browser reaches the published API port on the host.
+        NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-4000}
+        NEXT_PUBLIC_TENANT_SLUG: ${NEXT_PUBLIC_TENANT_SLUG:-demo-arena}
+    image: bookcourt-web
+    init: true
+    restart: unless-stopped
+    environment:
+      # Server-side admin proxy. Reaches the API on the Compose network, not via localhost.
+      API_INTERNAL_URL: http://api:4000
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
