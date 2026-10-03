@@ -1,6 +1,6 @@
-# book-court-BE
+# book-court-BE · Book Court PH
 
-API for **BookCourt**, a multi-tenant court reservation platform for venues with pickleball,
+API for **Book Court PH**, a multi-tenant court reservation platform for venues with pickleball,
 basketball and badminton courts. Built for the Philippines: times are handled in each venue's
 timezone (`Asia/Manila` by default) and prices are in PHP.
 

@@ -50,7 +50,7 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
   if (env.SWAGGER_ENABLED) {
     await app.register(swagger, {
       openapi: {
-        info: { title: 'BookCourt API', version: '0.1.0', description: 'Multi-tenant court reservation API (demo)' },
+        info: { title: 'Book Court PH API', version: '0.1.0', description: 'Multi-tenant court reservation API (demo)' },
         components: {
           securitySchemes: {
             bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
