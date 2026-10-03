@@ -14,7 +14,17 @@ declare module 'fastify' {
 }
 
 export function createPool(connectionString = env.DATABASE_URL) {
-  return new pg.Pool({ connectionString, max: 10 });
+  return new pg.Pool({
+    connectionString,
+    max: env.DATABASE_POOL_MAX,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    // Kill runaway queries instead of letting them hold connections.
+    statement_timeout: env.DATABASE_STATEMENT_TIMEOUT_MS,
+    application_name: 'book-court-api',
+    // Managed Postgres (RDS, Cloud SQL, Supabase, Neon...) usually requires TLS.
+    ssl: env.DATABASE_SSL === 'disable' ? undefined : { rejectUnauthorized: env.DATABASE_SSL === 'verify' },
+  });
 }
 
 export default fp(

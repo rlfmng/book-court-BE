@@ -17,7 +17,8 @@
     "seed": "tsx src/scripts/seed.ts",
     "seed:prod": "node dist/scripts/seed.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "tenant:create": "tsx src/scripts/create-tenant.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

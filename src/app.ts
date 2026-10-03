@@ -30,8 +30,19 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
     logger:
       env.NODE_ENV === 'development'
         ? { level: env.LOG_LEVEL, transport: { target: 'pino-pretty', options: { translateTime: 'SYS:HH:MM:ss' } } }
-        : { level: env.LOG_LEVEL },
-    trustProxy: true,
+        : {
+            level: env.LOG_LEVEL,
+            // Never write credentials or customer contact details to logs.
+            redact: {
+              paths: ['req.headers.authorization', 'req.headers.cookie', '*.password', '*.customerPhone', '*.customerEmail'],
+              censor: '[redacted]',
+            },
+          },
+    // Only trust X-Forwarded-For from the configured number of proxy hops (see TRUST_PROXY).
+    trustProxy: env.TRUST_PROXY > 0 ? (_address: string, hop: number) => hop < env.TRUST_PROXY : false,
+    bodyLimit: env.BODY_LIMIT_BYTES,
+    connectionTimeout: 30_000,
+    requestTimeout: 30_000,
     ...opts,
   }).withTypeProvider<ZodTypeProvider>();
 
