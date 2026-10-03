@@ -51,7 +51,8 @@ pnpm dev                               # http://localhost:4000, reloads on chang
 | `pnpm migrate` | Apply pending SQL migrations (`migrations/`) |
 | `pnpm migrate:down` | Roll back the last migration |
 | `pnpm migrate:create <name>` | Create a new SQL migration file |
-| `pnpm seed` | Seed the demo tenant, owner, 4 courts and sample bookings (idempotent) |
+| `pnpm seed` | Seed the sample venue (Demo Arena): owner, 4 courts and sample bookings (idempotent) |
+| `pnpm tenant:create --slug … --name … --email … --password …` | Onboard a real venue and its owner, or add a staff account (`--role staff`). In the container: `node dist/scripts/create-tenant.js …` |
 | `pnpm test` | Run Vitest (unit + integration; needs Postgres and Redis) |
 | `pnpm typecheck` | `tsc --noEmit` |
 
@@ -63,14 +64,20 @@ clear message if any are invalid. See `.env.example`.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `NODE_ENV` | `development` | `development` \| `test` \| `production` |
+| `APP_ENV` | `local` | `local` \| `staging` \| `production`. `production` enables the startup safety checks (see below) and turns Swagger off by default |
+| `TRUST_PROXY` | `0` | Number of reverse proxies in front of the API. Used to read the real client IP for rate limiting. `0` ignores `X-Forwarded-For` |
 | `HOST` / `PORT` | `0.0.0.0` / `4000` | Listen address |
 | `LOG_LEVEL` | `info` | Pino log level |
 | `DATABASE_URL` | – (required) | Postgres connection string |
+| `DATABASE_SSL` | `disable` | `disable` \| `require` (TLS, no CA check) \| `verify` (TLS + CA check). Managed Postgres usually needs `require` or `verify` |
+| `DATABASE_POOL_MAX` | `10` | Max Postgres connections per API instance |
+| `DATABASE_STATEMENT_TIMEOUT_MS` | `10000` | Queries running longer than this are cancelled |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
 | `JWT_SECRET` | – (required, ≥ 32 chars) | Secret used to sign staff JWTs |
 | `JWT_EXPIRES_IN` | `12h` | Staff token lifetime |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed browser origins |
-| `SWAGGER_ENABLED` | `true` | Serve OpenAPI docs at `/docs` |
+| `SWAGGER_ENABLED` | on, except when `APP_ENV=production` | Serve OpenAPI docs at `/docs` |
+| `BODY_LIMIT_BYTES` | `65536` | Max request body size |
 | `AVAILABILITY_CACHE_TTL_SECONDS` | `30` | Availability cache TTL |
 | `BOOKING_LOCK_TTL_MS` | `5000` | Redis per-slot lock TTL while creating a booking |
 | `RATE_LIMIT_ENABLED` | `true` | Toggle rate limiting on public routes |
@@ -81,6 +88,21 @@ clear message if any are invalid. See `.env.example`.
 
 Tests use `TEST_DATABASE_URL` (default `postgres://bookcourt:bookcourt@localhost:5432/bookcourt_test`,
 created automatically) and `TEST_REDIS_URL` (default Redis DB 15).
+
+### Production safety checks
+
+With `APP_ENV=production` the API **refuses to start** if:
+- `JWT_SECRET` looks like a placeholder
+- `NODE_ENV` isn't `production`
+- any `CORS_ORIGINS` entry isn't an exact `https://` origin
+
+`pnpm seed` also refuses to create the sample venue in production with the default owner password.
+
+Logs redact `Authorization` and cookie headers, passwords and customer contact details.
+
+## Deployment
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)**. It covers the production Docker Compose stack (Caddy with automatic HTTPS), onboarding a venue, backups, updates and rollback, and a go-live checklist. CI (`.github/workflows/ci.yml`) runs typecheck, tests, build, migrations and a Docker build on every PR, and on pushes to `staging` and `main`.
 
 ## API
 
@@ -153,13 +175,16 @@ book-court-BE/
 │   │   ├── health/
 │   │   └── tenants/
 │   │       # each module: *.routes.ts, *.schemas.ts, *.service.ts, *.repository.ts
-│   ├── scripts/seed.ts
+│   ├── scripts/                # seed.ts (sample venue), create-tenant.ts (onboard real venues)
 │   ├── utils/                  # errors, time (timezone math), lock, phone, reference codes
 │   ├── app.ts                  # buildApp() (used by server and tests)
 │   └── server.ts
 ├── tests/                      # Vitest: slots.test.ts, bookings.test.ts
 ├── Dockerfile                  # multi-stage, non-root runtime
-├── docker-compose.yml          # postgres, redis, api (with healthchecks + volumes)
+├── docker-compose.yml          # local stack: postgres, redis, api, web (ports published for dev)
+├── docker-compose.prod.yml     # production stack: caddy (HTTPS) → web + api → postgres + redis
+├── deploy/                     # Caddyfile, backup.sh
+├── DEPLOYMENT.md               # how to run it in production
 └── docker-entrypoint.sh        # runs migrations before starting
 ```
 
