@@ -28,6 +28,12 @@ const BOOKINGS: Array<[number, number, number, number, string, string, string]> 
 ];
 
 async function main() {
+  if (env.isProduction && env.SEED_OWNER_PASSWORD === 'demo-owner-123') {
+    throw new Error(
+      'Refusing to seed the sample venue in production with the default owner password. ' +
+        'Set SEED_OWNER_PASSWORD, or onboard a real venue with `pnpm tenant:create` instead.',
+    );
+  }
   const pool = createPool();
   const client = await pool.connect();
   try {
@@ -86,7 +92,9 @@ async function main() {
     }
 
     console.log(`Seeded tenant "${TENANT.slug}" (${tenant.id})`);
-    console.log(`  owner login: ${env.SEED_OWNER_EMAIL} / ${env.SEED_OWNER_PASSWORD}`);
+    // Only echo the password when it's the well-known local demo default.
+    const shownPassword = env.SEED_OWNER_PASSWORD === 'demo-owner-123' ? env.SEED_OWNER_PASSWORD : '(from SEED_OWNER_PASSWORD)';
+    console.log(`  owner login: ${env.SEED_OWNER_EMAIL} / ${shownPassword}`);
     console.log(`  courts: ${courtIds.length}, new sample bookings: ${created}`);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -98,6 +106,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error(env.isProduction && err instanceof Error ? err.message : err);
   process.exit(1);
 });

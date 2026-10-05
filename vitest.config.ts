@@ -19,6 +19,9 @@ export default defineConfig({
       REDIS_URL: process.env.TEST_REDIS_URL ?? 'redis://localhost:6379/15',
       JWT_SECRET: 'test-secret-test-secret-test-secret-123',
       RATE_LIMIT_ENABLED: 'false',
+      // Neon Auth tests serve a JWKS from a local server on this port (tests/neon-auth.test.ts).
+      STAFF_AUTH: 'both',
+      NEON_AUTH_JWKS_URL: 'http://127.0.0.1:47123/jwks',
       SWAGGER_ENABLED: 'false',
     },
   },

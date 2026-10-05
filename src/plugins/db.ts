@@ -1,6 +1,7 @@
 import fp from 'fastify-plugin';
 import pg from 'pg';
 import { env } from '../config/env.js';
+import { buildPgConfig } from '../config/database.js';
 
 // Return DATE columns as plain 'YYYY-MM-DD' strings instead of JS Dates (avoids TZ shifts).
 pg.types.setTypeParser(pg.types.builtins.DATE, (v) => v);
@@ -13,8 +14,19 @@ declare module 'fastify' {
   }
 }
 
+/** node-postgres config for DATABASE_URL (or another URL, e.g. MIGRATION_DATABASE_URL). */
+export function pgConfig(connectionString = env.DATABASE_URL) {
+  const { sslMode: _sslMode, ...config } = buildPgConfig(connectionString, {
+    ssl: env.DATABASE_SSL,
+    sslCa: env.DATABASE_SSL_CA,
+    // Kill runaway queries instead of letting them hold connections.
+    statementTimeoutMs: env.DATABASE_STATEMENT_TIMEOUT_MS,
+  });
+  return config;
+}
+
 export function createPool(connectionString = env.DATABASE_URL) {
-  return new pg.Pool({ connectionString, max: 10 });
+  return new pg.Pool({ ...pgConfig(connectionString), max: env.DATABASE_POOL_MAX, idleTimeoutMillis: 30_000 });
 }
 
 export default fp(

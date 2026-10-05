@@ -1,0 +1,33 @@
+# Caddy obtains and renews the TLS certificate for SITE_DOMAIN automatically (Let's Encrypt).
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	request_body {
+		max_size 1MB
+	}
+
+	# Public API and health check go straight to Fastify; everything else is the Next.js app
+	# (including its own /api/auth and /api/backend route handlers).
+	@api path /api/v1/* /health
+	handle @api {
+		reverse_proxy api:4000
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+

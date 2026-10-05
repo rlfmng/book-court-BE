@@ -11,13 +11,15 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
-    "migrate": "node-pg-migrate -m migrations -d DATABASE_URL --no-verbose up",
+    "migrate": "tsx src/scripts/migrate.ts",
     "migrate:down": "node-pg-migrate -m migrations --migration-file-language sql -d DATABASE_URL down",
     "migrate:create": "node-pg-migrate -m migrations --migration-file-language sql create",
     "seed": "tsx src/scripts/seed.ts",
     "seed:prod": "node dist/scripts/seed.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "tenant:create": "tsx src/scripts/create-tenant.ts",
+    "migrate:prod": "node dist/scripts/migrate.js"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
@@ -34,6 +36,7 @@
     "fastify-plugin": "^6.0.0",
     "fastify-type-provider-zod": "^7.0.0",
     "ioredis": "^6.0.0",
+    "jose": "^6.2.12",
     "node-pg-migrate": "^9.0.0",
     "pg": "^8.23.1",
     "zod": "^4.6.5"
