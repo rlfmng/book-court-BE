@@ -77,6 +77,10 @@ clear message if any are invalid. See `.env.example`.
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
 | `JWT_SECRET` | – (required, ≥ 32 chars) | Secret used to sign staff JWTs |
 | `JWT_EXPIRES_IN` | `12h` | Staff token lifetime |
+| `STAFF_AUTH` | `password` | How staff sign in: `password` (local email + password), `neon` (Neon Auth only) or `both` |
+| `NEON_AUTH_JWKS_URL` | – | Neon console → Connect → Auth → JWKS URL. Required for `neon`/`both` |
+| `NEON_AUTH_ISSUER` / `NEON_AUTH_AUDIENCE` | – | Optional extra checks on the Neon Auth JWT |
+| `NEON_AUTH_REQUIRE_VERIFIED_EMAIL` | `true` | Only accept Neon Auth users with a verified email. Turn off only if Neon Auth sign-up is disabled |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed browser origins |
 | `SWAGGER_ENABLED` | on, except when `APP_ENV=production` | Serve OpenAPI docs at `/docs` |
 | `BODY_LIMIT_BYTES` | `65536` | Max request body size |
@@ -121,7 +125,8 @@ Every `/api/v1` route requires the `x-tenant-slug` header. Errors always look li
 | POST | `/api/v1/bookings` | public, rate-limited | `{ courtId, date, startTime, hours(1-3), customerName, customerPhone, customerEmail }` |
 | GET | `/api/v1/bookings/lookup?reference=&phone=` | public, rate-limited | Both must match |
 | POST | `/api/v1/bookings/:id/cancel` | customer (`{ reference, phone }`) or staff token | Frees the slot |
-| POST | `/api/v1/auth/login` | public, rate-limited | Returns a JWT scoped to the tenant |
+| POST | `/api/v1/auth/login` | public, rate-limited | Email + password. Returns a JWT scoped to the tenant (`STAFF_AUTH=password|both`) |
+| POST | `/api/v1/auth/neon` | public, rate-limited | `{ token }`: exchanges a Neon Auth JWT for the same staff session (`STAFF_AUTH=neon|both`) |
 | GET | `/api/v1/auth/me` | staff | |
 | POST | `/api/v1/courts` | owner | Create a court |
 | PATCH | `/api/v1/courts/:id` | owner | Edit name, sport, price, hours or `isActive` |
@@ -154,6 +159,25 @@ Other rules:
 - **Price:** always `price_per_hour × hours` from the database. Anything the client sends is ignored.
 - **Phone numbers:** normalised to E.164 (`0917 123 4567` → `+639171234567`), so lookups work however the number was typed.
 - **Passwords:** hashed with argon2id. Login runs the same hash work for unknown emails, so response timing doesn't reveal which emails exist.
+
+## Staff sign-in with Neon Auth
+
+With `STAFF_AUTH=neon` (or `both`), staff sign in with **Neon Auth** (hosted Better Auth):
+1. The web app's login handler signs in at Neon Auth (`/sign-in/email`) on the server and fetches a
+   short-lived JWT (`/token`).
+2. It sends that JWT to `POST /api/v1/auth/neon`.
+3. The API verifies it against `NEON_AUTH_JWKS_URL`, then looks up a **pre-registered** staff record
+   for this venue by email.
+4. It returns the usual venue-scoped session.
+
+Neon Auth only proves who someone is. Which venue they belong to and their role (owner or staff)
+stay in this API's `users` table.
+
+- **Add staff without a password:** `pnpm tenant:create --slug demo-arena --email desk@venue.ph --role staff`.
+  The person creates a Neon Auth account with that email, or you add them in the Neon console.
+- **Verified emails only, by default.** On first sign-in the staff record is pinned to that Neon Auth
+  user id, so a different account that later registers the same email is refused.
+- **Recommended:** turn off public sign-up in Neon Auth, so only invited staff have accounts.
 
 ## Multi-tenancy
 

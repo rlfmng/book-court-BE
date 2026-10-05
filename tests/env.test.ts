@@ -27,3 +27,14 @@ describe('productionProblems', () => {
     expect(problems).toHaveLength(4);
   });
 });
+
+describe('configProblems', () => {
+  it('requires a JWKS URL when staff sign in with Neon Auth', async () => {
+    const { configProblems } = await import('../src/config/env.js');
+    const cfg = (STAFF_AUTH: string, NEON_AUTH_JWKS_URL?: string) =>
+      ({ STAFF_AUTH, NEON_AUTH_JWKS_URL }) as unknown as Parameters<typeof configProblems>[0];
+    expect(configProblems(cfg('password'))).toEqual([]);
+    expect(configProblems(cfg('neon'))).toHaveLength(1);
+    expect(configProblems(cfg('both', 'https://ep-x.neonauth.example/neondb/auth/jwks'))).toEqual([]);
+  });
+});

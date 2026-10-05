@@ -45,6 +45,22 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('12h'),
 
+  /**
+   * How staff sign in. password: local email + password (argon2). neon: Neon Auth only (the web app
+   * signs in at Neon Auth and exchanges its JWT at POST /auth/neon). both: either.
+   */
+  STAFF_AUTH: z.enum(['password', 'neon', 'both']).default('password'),
+  /** Neon Auth JWKS URL (Neon console → Connect → Auth → JWKS URL). Required unless STAFF_AUTH=password. */
+  NEON_AUTH_JWKS_URL: z.url().optional(),
+  /** Optional extra checks on the Neon Auth JWT's iss / aud claims. */
+  NEON_AUTH_ISSUER: z.string().optional(),
+  NEON_AUTH_AUDIENCE: z.string().optional(),
+  /**
+   * Only accept Neon Auth users whose email is verified. Keep this on unless Neon Auth sign-up is
+   * disabled: otherwise anyone could register a staff member's email and sign in as them.
+   */
+  NEON_AUTH_REQUIRE_VERIFIED_EMAIL: booleanish.default(true),
+
   CORS_ORIGINS: z
     .string()
     .default('http://localhost:3000')
@@ -80,6 +96,18 @@ export function productionProblems(e: ParsedEnv): string[] {
     if (origin === '*') problems.push('CORS_ORIGINS must list exact origins, not "*"');
     else if (!origin.startsWith('https://')) problems.push(`CORS_ORIGINS entry "${origin}" must use https://`);
   }
+  if (e.NEON_AUTH_JWKS_URL && !e.NEON_AUTH_JWKS_URL.startsWith('https://')) {
+    problems.push('NEON_AUTH_JWKS_URL must use https://');
+  }
+  return problems;
+}
+
+/** Rules that apply in every stage. */
+export function configProblems(e: ParsedEnv): string[] {
+  const problems: string[] = [];
+  if (e.STAFF_AUTH !== 'password' && !e.NEON_AUTH_JWKS_URL) {
+    problems.push(`NEON_AUTH_JWKS_URL is required when STAFF_AUTH=${e.STAFF_AUTH}`);
+  }
   return problems;
 }
 
@@ -92,9 +120,9 @@ function loadEnv(): Env {
     }
     process.exit(1);
   }
-  const problems = productionProblems(parsed.data);
+  const problems = [...configProblems(parsed.data), ...productionProblems(parsed.data)];
   if (problems.length) {
-    console.error('Refusing to start with an unsafe production configuration:');
+    console.error('Refusing to start with an unsafe or incomplete configuration:');
     for (const p of problems) console.error(`  - ${p}`);
     process.exit(1);
   }
