@@ -3,7 +3,7 @@ set -e
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   echo "Running database migrations..."
-  ./node_modules/.bin/node-pg-migrate -m migrations -d DATABASE_URL --no-verbose up
+  node dist/scripts/migrate.js
 fi
 
 if [ "${RUN_SEED:-false}" = "true" ]; then

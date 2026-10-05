@@ -25,10 +25,21 @@ const EnvSchema = z.object({
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
 
   DATABASE_URL: z.url(),
-  /** disable: plain TCP (Docker network) · require: TLS without CA verification · verify: TLS + CA check. */
-  DATABASE_SSL: z.enum(['disable', 'require', 'verify']).default('disable'),
+  /**
+   * Optional direct (non-pooled) connection for migrations, which need session features such as
+   * advisory locks. Use it when DATABASE_URL points at a transaction-mode pooler. Defaults to DATABASE_URL.
+   */
+  MIGRATION_DATABASE_URL: z.url().optional(),
+  /**
+   * disable: plain TCP (Docker network) · require: TLS without CA verification · verify: TLS + CA check.
+   * Unset = taken from the URL's sslmode (Supabase/Neon URLs include sslmode=require), else disable.
+   */
+  DATABASE_SSL: z.enum(['disable', 'require', 'verify']).optional(),
+  /** CA for DATABASE_SSL=verify: PEM text or a file path (e.g. Supabase's downloadable CA certificate). */
+  DATABASE_SSL_CA: z.string().optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
-  DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10_000),
+  /** 0 disables it; required for transaction-mode poolers (Supabase :6543, Neon "-pooler" hosts). */
+  DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
