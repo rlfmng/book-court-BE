@@ -48,7 +48,7 @@ pnpm dev                               # http://localhost:4000, reloads on chang
 | `pnpm dev` | Start the API with `tsx watch` (pretty logs) |
 | `pnpm build` | Compile TypeScript to `dist/` |
 | `pnpm start` | Run the compiled API (`node dist/server.js`) |
-| `pnpm migrate` | Apply pending SQL migrations (`migrations/`) |
+| `pnpm migrate` | Apply pending SQL migrations (`migrations/`). Uses the same TLS handling as the API (works with Neon). In the container: `node dist/scripts/migrate.js` (the entrypoint runs it on start) |
 | `pnpm migrate:down` | Roll back the last migration |
 | `pnpm migrate:create <name>` | Create a new SQL migration file |
 | `pnpm seed` | Seed the sample venue (Demo Arena): owner, 4 courts and sample bookings (idempotent) |
@@ -69,9 +69,11 @@ clear message if any are invalid. See `.env.example`.
 | `HOST` / `PORT` | `0.0.0.0` / `4000` | Listen address |
 | `LOG_LEVEL` | `info` | Pino log level |
 | `DATABASE_URL` | – (required) | Postgres connection string |
-| `DATABASE_SSL` | `disable` | `disable` \| `require` (TLS, no CA check) \| `verify` (TLS + CA check). Managed Postgres usually needs `require` or `verify` |
+| `MIGRATION_DATABASE_URL` | = `DATABASE_URL` | Optional direct (non-pooled) connection for migrations, which need session features. Use it when `DATABASE_URL` points at a transaction-mode pooler |
+| `DATABASE_SSL` | from the URL's `sslmode` | `disable` \| `require` (TLS, no CA check) \| `verify` (TLS + CA check). Unset follows the URL's `sslmode` (Neon and Supabase URLs include `sslmode=require`) |
+| `DATABASE_SSL_CA` | – | CA certificate for `verify` (PEM text or file path). Neon uses a public CA, so it isn't needed there |
 | `DATABASE_POOL_MAX` | `10` | Max Postgres connections per API instance |
-| `DATABASE_STATEMENT_TIMEOUT_MS` | `10000` | Queries running longer than this are cancelled |
+| `DATABASE_STATEMENT_TIMEOUT_MS` | `10000` | Queries running longer than this are cancelled. `0` disables it, which transaction-mode poolers (Neon `-pooler` hosts) require |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
 | `JWT_SECRET` | – (required, ≥ 32 chars) | Secret used to sign staff JWTs |
 | `JWT_EXPIRES_IN` | `12h` | Staff token lifetime |

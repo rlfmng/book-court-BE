@@ -118,6 +118,59 @@ took before updating.
   Passwords, tokens, cookies and customer phone numbers and emails are redacted.
 - **Disk:** keep an eye on `docker system df` and the `backups/` folder.
 
+## Using Neon for the database (web app on Netlify)
+
+This is the planned setup: **Neon** (Postgres, Singapore) + **the API container on a host that runs
+Docker** + **the web app on Netlify** (see book-court-FE's README). The Compose stack above isn't
+used: Neon replaces its `postgres` service, and Netlify replaces `web` and `caddy`.
+
+**1. Neon project:** project `book-court-ph`, region **AWS Asia Pacific 1 (Singapore)**. From the
+Neon console, Connect → copy two connection strings for the `production` branch:
+- **Direct** (host `ep-….ap-southeast-1.aws.neon.tech`): use it for `DATABASE_URL`. The API is a
+  long-running server with its own small pool (`DATABASE_POOL_MAX=10`), so it doesn't need Neon's
+  pooler.
+- (Optional) **Pooled** (host contains `-pooler`): only if you run many API instances. Then set
+  `DATABASE_URL` to the pooled string, `DATABASE_STATEMENT_TIMEOUT_MS=0` (PgBouncer rejects that
+  setting), and `MIGRATION_DATABASE_URL` to the direct string (migrations need a session).
+
+Keep `?sslmode=require` in the URL. The API reads it and connects over TLS. `btree_gist` (the
+double-booking guard) is supported on Neon, and the first migration creates it.
+
+**2. Redis:** create an [Upstash](https://upstash.com) Redis database in Singapore and use its
+`rediss://…` URL as `REDIS_URL`. It holds the availability cache, booking locks and rate limits.
+
+**3. API host:** run this repo's Dockerfile on a container host (Render, Railway, Fly.io or a VPS)
+in Singapore, with these environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `NODE_ENV` / `APP_ENV` | `production` / `production` |
+| `DATABASE_URL` | Neon direct connection string |
+| `REDIS_URL` | Upstash `rediss://` URL |
+| `JWT_SECRET` | `openssl rand -base64 48` |
+| `CORS_ORIGINS` | the Netlify site, e.g. `https://bookcourt.ph,https://staging--bookcourt.netlify.app` |
+| `TRUST_PROXY` | `1` (the host's load balancer is one hop) |
+
+The container runs migrations on start (`RUN_MIGRATIONS=true` is the default), then starts the API
+on port 4000. Health check path: `/health`.
+
+**4. Data:** run the onboarding scripts once against Neon, either from the host's shell
+(`node dist/scripts/create-tenant.js …`, `node dist/scripts/seed.js`) or from your laptop with
+`DATABASE_URL` set to the Neon URL (`pnpm migrate`, `pnpm tenant:create …`).
+
+**Neon notes:**
+- **Backups:** Neon keeps point-in-time history (restore window depends on the plan) and lets you
+  branch from any point. Before risky changes, create a branch as a snapshot. `deploy/backup.sh` is
+  only for the self-hosted Compose stack.
+- **Scale to zero:** on the free plan the compute sleeps after a few idle minutes, and the first
+  request wakes it (about a second). An uptime monitor hitting `/health` keeps it awake but uses
+  compute hours.
+- **Preview data:** a Neon branch per environment (for example `staging`) gives the staging API its
+  own copy of the data.
+- **Row Level Security:** it's enabled on every table (migration `1759500000000_enable-rls`), so
+  Neon's optional Data API can't read the tables. The API is unaffected, because it connects as the
+  tables' owner.
+
 ## Go-live checklist
 
 - [ ] DNS resolves to the server, and ports 80 and 443 are open
@@ -126,7 +179,7 @@ took before updating.
 - [ ] Venue created with `create-tenant`, `TENANT_SLUG` set, and the web image rebuilt
 - [ ] `src/content/venue.ts` has the real contacts and `isSample: false` (or keep the sample banner for demos)
 - [ ] Owner can log in, courts and prices are set, and a test booking can be made and cancelled
-- [ ] Nightly backup cron is installed, a copy goes off the server, and a restore has been tested
+- [ ] Backups: the nightly cron plus an off-server copy (Compose stack), or Neon's restore window checked (Neon)
 - [ ] Uptime monitor on `/health`
 - [ ] GitHub: branch protection on `main` and `staging` (require PR and green CI)
 
